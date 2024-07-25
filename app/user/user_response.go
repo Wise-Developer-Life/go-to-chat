@@ -1,4 +1,4 @@
-package response
+package user
 
 import "go-to-chat/app/model"
 

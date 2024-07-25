@@ -2,21 +2,29 @@ package utility
 
 import (
 	"github.com/gin-gonic/gin"
-	"go-to-chat/app/dto/response"
 )
 
-func SendSuccessResponse(c *gin.Context, statusCode int, message string, data interface{}) {
-	res := response.ApiResponse{
+type ApiResponse struct {
+	Status  string `json:"status"`
+	Message string `json:"message"`
+	Data    any    `json:"data,omitempty"`
+}
+
+func NotifyError(c *gin.Context, err error) {
+	c.Error(err)
+	c.Abort()
+}
+
+func SendSuccessResponse(c *gin.Context, statusCode int, message string, data any) {
+	c.JSON(statusCode, ApiResponse{
 		Status:  "success",
 		Message: message,
 		Data:    data,
-	}
-
-	c.JSON(statusCode, res)
+	})
 }
 
 func SendErrorResponse(c *gin.Context, statusCode int, errorCode string, message string) {
-	res := response.ApiResponse{
+	res := ApiResponse{
 		Status:  errorCode,
 		Message: message,
 	}

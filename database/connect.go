@@ -1,7 +1,7 @@
 package database
 
 import (
-	"go-to-chat/app/model"
+	//"go-to-chat/app/user"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"log"
@@ -16,12 +16,11 @@ func SetupDatabase() {
 		panic("failed to connect database")
 	}
 
-	err = migration(db)
-	if err != nil {
-		panic("failed to migrate database")
-	}
+	//err = migration(db)
+	//if err != nil {
+	//	panic("failed to migrate database")
+	//}
 
-	// log.Println("Database connected")
 	log.Println("Database connected")
 
 	dbInstance = db
@@ -35,11 +34,11 @@ func isDbAvailable() bool {
 	return dbInstance != nil
 }
 
-func migration(db *gorm.DB) error {
-	err := db.AutoMigrate(&model.User{})
-
-	if err != nil {
-		return err
-	}
-	return nil
-}
+//func migration(db *gorm.DB) error {
+//	err := db.AutoMigrate(&user.User{})
+//
+//	if err != nil {
+//		return err
+//	}
+//	return nil
+//}

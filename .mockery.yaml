@@ -1,0 +1,16 @@
+disable-version-string: True
+with-expecter: true
+mockname: "Mock{{.InterfaceName}}"
+filename: "mock_{{.InterfaceName}}.go"
+dir: "mocks/{{.PackagePath}}"
+outpkg: "{{.PackageName}}"
+packages:
+  go-to-chat/app/user:
+    config:
+    interfaces:
+      UserRepository:
+
+  go-to-chat/app/utility:
+    config:
+    interfaces:
+      PasswordUtil:

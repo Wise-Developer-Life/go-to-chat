@@ -2,19 +2,37 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
-	userController "go-to-chat/app/controller"
+	authController "go-to-chat/app/auth"
+	"go-to-chat/app/middleware"
+	userController "go-to-chat/app/user"
 )
 
 func SetupRoutes(router *gin.Engine) {
 	apiRouter := router.Group("/api/")
 	{
-		v1Router := apiRouter.Group("/v1/")
+		v1Group := apiRouter.Group("/v1/")
 		{
-			userRouter := v1Router.Group("/user/")
+			v1Group.POST("/user", userController.CreateUser)
+			v1Group.POST("/auth/login", authController.Login)
+
+			authWithRefreshTokenGroup := v1Group.Group("/")
+			authWithRefreshTokenGroup.Use(middleware.AuthHandler(middleware.TokenTypeRefreshToken))
 			{
-				userRouter.GET("/:id", userController.GetUser)
-				userRouter.POST("/", userController.CreateUser)
-				userRouter.PUT("/:id", userController.UpdateUser)
+				authWithRefreshTokenGroup.POST("/auth/refresh", authController.RefreshToken)
+			}
+
+			authWithAccessTokenGroup := v1Group.Group("/")
+			authWithAccessTokenGroup.Use(middleware.AuthHandler(middleware.TokenTypeAccessToken))
+			{
+				authRouter := authWithAccessTokenGroup.Group("/auth")
+				{
+					authRouter.POST("/logout", authController.Logout)
+				}
+				userRouter := authWithAccessTokenGroup.Group("/user")
+				{
+					userRouter.GET("/:id", userController.GetUser)
+					userRouter.PUT("/:id", userController.UpdateUser)
+				}
 			}
 		}
 	}

@@ -1,19 +1,27 @@
-package controller
+package user
 
 import (
 	"github.com/gin-gonic/gin"
-	"go-to-chat/app/dto/response"
+	"go-to-chat/app/exception"
 	"go-to-chat/app/model"
-	userService "go-to-chat/app/service"
 	"go-to-chat/app/utility"
+	"log"
 	"net/http"
 	"strconv"
 )
 
+var userService = NewUserService(NewUserRepository())
+
 func GetUser(c *gin.Context) {
+	if requestUser, existed := c.Get("user-info"); existed {
+		log.Println("Request User: ", requestUser)
+	} else {
+		utility.SendErrorResponse(c, http.StatusUnauthorized, "exception", "Unauthorized")
+	}
+
 	userId, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.Error(err)
+		utility.NotifyError(c, err)
 		return
 	}
 
@@ -21,15 +29,15 @@ func GetUser(c *gin.Context) {
 	user, err = userService.GetUser(userId)
 
 	if err != nil {
-		c.Error(err)
+		utility.NotifyError(c, err)
 		return
 	}
 
-	utility.SendSuccessResponse(c, http.StatusOK, "success", response.NewUserResponse(user))
+	utility.SendSuccessResponse(c, http.StatusOK, "success", NewUserResponse(user))
 }
 
 func CreateUser(c *gin.Context) {
-	var body userService.CreateUserBody
+	var body CreateUserBody
 	err := c.BindJSON(&body)
 
 	if err != nil {
@@ -44,31 +52,31 @@ func CreateUser(c *gin.Context) {
 		return
 	}
 
-	utility.SendSuccessResponse(c, http.StatusCreated, "success", response.NewUserResponse(newUser))
+	utility.SendSuccessResponse(c, http.StatusCreated, "success", NewUserResponse(newUser))
 }
 
 func UpdateUser(c *gin.Context) {
 	userId, err := strconv.Atoi(c.Param("id"))
 
 	if err != nil {
-		utility.SendErrorResponse(c, http.StatusBadRequest, "exception", err.Error())
+		utility.NotifyError(c, exception.NewBadRequestError(err.Error()))
 		return
 	}
 
-	var body userService.UpdateUserBody
+	var body UpdateUserBody
 	err = c.BindJSON(&body)
 
 	if err != nil {
-		utility.SendErrorResponse(c, http.StatusBadRequest, "exception", err.Error())
+		utility.NotifyError(c, exception.NewBadRequestError(err.Error()))
 		return
 	}
 
 	updatedUser, err := userService.UpdateUser(userId, &body)
 
 	if err != nil {
-		utility.SendErrorResponse(c, http.StatusBadRequest, "exception", err.Error())
+		utility.NotifyError(c, exception.NewBadRequestError(err.Error()))
 		return
 	}
 
-	utility.SendSuccessResponse(c, http.StatusOK, "success", response.NewUserResponse(updatedUser))
+	utility.SendSuccessResponse(c, http.StatusOK, "success", NewUserResponse(updatedUser))
 }

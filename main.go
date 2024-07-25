@@ -17,7 +17,6 @@ func main() {
 	app.StaticFile("/", "./home.html")
 	app.GET("/ws", chat.HandleChatSocket())
 
-	app.Use(gin.Logger())
 	app.Use(middleware.ErrorHandler())
 
 	router.SetupRoutes(app)

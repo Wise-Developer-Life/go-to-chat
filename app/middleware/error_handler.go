@@ -5,7 +5,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"go-to-chat/app/exception"
 	"go-to-chat/app/utility"
-	"log"
 	"net/http"
 )
 
@@ -14,7 +13,9 @@ func ErrorHandler() gin.HandlerFunc {
 		context.Next()
 
 		err := context.Errors.Last()
-		log.Println(err)
+		if err == nil {
+			return
+		}
 
 		var customErr exception.BaseError
 		if ok := errors.As(err, &customErr); ok {
@@ -32,8 +33,5 @@ func ErrorHandler() gin.HandlerFunc {
 				err.Error(),
 			)
 		}
-
-		context.Abort()
-		return
 	}
 }
