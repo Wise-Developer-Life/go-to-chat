@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"go-to-chat/app/chat"
 	"go-to-chat/app/middleware"
@@ -15,6 +16,13 @@ func main() {
 
 	// FIXME: This is a security risk, do not use this in production
 	app.StaticFile("/", "./home.html")
+
+	app.Use(cors.New(cors.Config{
+		// TODO: disable this in future
+		AllowOrigins: []string{"*"}, // Allow all origins
+		AllowHeaders: []string{"Origin", "Content-Type", "Authorization"},
+	}))
+
 	app.GET("/ws", chat.HandleChatSocket())
 
 	app.Use(middleware.ErrorHandler())
