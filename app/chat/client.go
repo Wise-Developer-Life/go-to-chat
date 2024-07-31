@@ -1,11 +1,9 @@
-// Copyright 2013 The Gorilla WebSocket Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
 package chat
 
 import (
 	"bytes"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -35,6 +33,14 @@ var (
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
+	//TODO change this to allow only localhost:3000
+	CheckOrigin: func(r *http.Request) bool {
+		return r.Header.Get("Origin") == "http://localhost:3000"
+	},
+}
+
+type WsClientInterface interface {
+	Send(payload any)
 }
 
 // Client is a middleman between the websocket connection and the hub.
@@ -46,6 +52,11 @@ type Client struct {
 
 	// Buffered channel of outbound messages.
 	send chan []byte
+}
+
+func (client *Client) Send(payload any) {
+	payloadBytes, _ := json.Marshal(payload)
+	client.send <- payloadBytes
 }
 
 // readPump pumps messages from the websocket connection to the hub.
@@ -76,12 +87,12 @@ func (client *Client) readPump() {
 			break
 		}
 		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
-		log.Println("Received message: " + string(message))
+		log.Println(fmt.Sprintf("Message received: %s", message))
 
 		// TODO: get room from client
-
 		rooms := hub.rooms
 
+		//TODO: optimize this
 		_, roomOfClient := rooms.Find(func(index int, room *Room) bool {
 			return room.clients[client]
 		})
@@ -116,7 +127,6 @@ func (client *Client) writePump() {
 				return
 			}
 			w.Write(message)
-			log.Println("Sent message: ", string(message))
 
 			// Add queued chat messages to the current websocket message.
 			n := len(client.send)
@@ -137,6 +147,20 @@ func (client *Client) writePump() {
 	}
 }
 
+func handleOnConnect(client *Client) {
+	helloPayload := &SocketResponse[string]{
+		Event: SocketEventJoin,
+		Data:  "Welcome to go to chat!",
+	}
+	helloPayloadJson, err := json.Marshal(helloPayload)
+
+	if err != nil {
+		log.Println(err)
+	}
+
+	client.send <- helloPayloadJson
+}
+
 // serveWs handles websocket requests from the peer.
 func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -145,9 +169,13 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	user := r.URL.Query().Get("user")
 	client := &Client{hub: hub, connection: conn, send: make(chan []byte, 256)}
-	log.Println("Client connected from: ", conn.RemoteAddr())
-	client.hub.register <- client
+
+	log.Println(fmt.Sprintf("Client %s connected", user))
+	hub.RegisterClient(user, client)
+
+	handleOnConnect(client)
 
 	// Allow collection of memory referenced by the caller by doing all work in
 	// new goroutines.

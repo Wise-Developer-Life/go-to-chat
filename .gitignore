@@ -29,3 +29,6 @@ go.work
 # build dir
 tmp/
 
+# test data
+data
+

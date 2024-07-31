@@ -1,32 +1,32 @@
 package main
 
 import (
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"go-to-chat/app/chat"
+	"go-to-chat/app/job"
 	"go-to-chat/app/middleware"
 	"go-to-chat/database"
 	"go-to-chat/router"
+	"log"
 )
 
 func main() {
 	database.SetupDatabase()
 
+	client := job.GetClientInstance()
+	defer func() {
+		if err := client.Close(); err != nil {
+			log.Fatalf("failed to close client: %v", err)
+		}
+	}()
+
+	jobRunner := job.CreateJobServer()
+	defer jobRunner.Shutdown()
+
 	app := gin.Default()
 
-	// FIXME: This is a security risk, do not use this in production
-	app.StaticFile("/", "./home.html")
-
-	app.Use(cors.New(cors.Config{
-		// TODO: disable this in future
-		AllowOrigins: []string{"*"}, // Allow all origins
-		AllowHeaders: []string{"Origin", "Content-Type", "Authorization"},
-	}))
-
 	app.GET("/ws", chat.HandleChatSocket())
-
 	app.Use(middleware.ErrorHandler())
-
 	router.SetupRoutes(app)
 
 	err := app.Run(":8082")

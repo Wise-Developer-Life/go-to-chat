@@ -19,6 +19,13 @@ func GetUser(c *gin.Context) {
 		utility.SendErrorResponse(c, http.StatusUnauthorized, "exception", "Unauthorized")
 	}
 
+	if c.Param("id") == "" {
+		email, _ := c.Get("user-info")
+		user, _ := userService.GetUserByEmail(email.(string))
+		utility.SendSuccessResponse(c, http.StatusOK, "success", NewUserResponse(user))
+		return
+	}
+
 	userId, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		utility.NotifyError(c, err)

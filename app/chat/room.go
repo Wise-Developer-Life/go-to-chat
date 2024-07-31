@@ -1,5 +1,15 @@
 package chat
 
+import (
+	"encoding/json"
+)
+
+type RoomInterface interface {
+	Join(...*Client)
+	Leave(...*Client)
+	Send(payload any)
+}
+
 type Room struct {
 	clients map[*Client]bool
 
@@ -10,17 +20,23 @@ type Room struct {
 	unregister chan *Client
 }
 
-func initializeRoom() *Room {
-	room := &Room{
-		broadcast:  make(chan []byte),
-		register:   make(chan *Client),
-		unregister: make(chan *Client),
-		clients:    make(map[*Client]bool),
+func (room *Room) Join(client ...*Client) {
+	for _, c := range client {
+		if c != nil {
+			room.register <- c
+		}
 	}
+}
 
-	go room.run()
+func (room *Room) Leave(client ...*Client) {
+	for _, c := range client {
+		room.unregister <- c
+	}
+}
 
-	return room
+func (room *Room) Send(payload any) {
+	payloadBytes, _ := json.Marshal(payload)
+	room.broadcast <- payloadBytes
 }
 
 func (room *Room) run() {
@@ -42,6 +58,20 @@ func (room *Room) run() {
 			}
 		}
 	}
+}
+
+func CreateRoom() *Room {
+	room := &Room{
+		broadcast:  make(chan []byte),
+		register:   make(chan *Client),
+		unregister: make(chan *Client),
+		clients:    make(map[*Client]bool),
+	}
+
+	hub.rooms.Add(room)
+	go room.run()
+
+	return room
 }
 
 func (room *Room) getSize() int {

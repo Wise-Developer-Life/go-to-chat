@@ -13,8 +13,8 @@ type LoginBody struct {
 }
 
 // FIXME: change duration
-var accessTokenDuration = time.Hour * 24
-var refreshTokenDuration = time.Hour * 24 * 30
+var accessTokenDuration = time.Hour * 1
+var refreshTokenDuration = time.Hour * 24 * 3
 
 type AuthService interface {
 	Login(body *LoginBody) (string, string, error)
