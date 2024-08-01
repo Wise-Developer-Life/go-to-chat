@@ -3,11 +3,12 @@ package socket
 type SocketEvent string
 
 const (
-	SocketEventMessage SocketEvent = "message"
-	SocketEventMatched SocketEvent = "matched"
-	SocketEventJoin    SocketEvent = "join"
-	SocketEventLeave   SocketEvent = "leave"
-	SocketEventError   SocketEvent = "error"
+	SocketEventMessage   SocketEvent = "message"
+	SocketEventMatched   SocketEvent = "matched"
+	SocketEventConnected SocketEvent = "connected"
+	SocketEventError     SocketEvent = "error"
+	SocketEventJoined    SocketEvent = "joined"
+	SocketEventLeft      SocketEvent = "left"
 )
 
 type Response[T any] struct {

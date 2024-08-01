@@ -29,6 +29,7 @@ type Client interface {
 	AddRoom(room Room)
 	RemoveRoom(room Room)
 	Send(payload any)
+	Close() error
 }
 
 type ClientImpl struct {
@@ -47,13 +48,16 @@ func NewClient(clientID string, connection *websocket.Conn) Client {
 		rooms:       hashmap.New[string, Room](),
 	}
 
-	go newClient.writePump()
-	go newClient.readPump()
-
 	connection.SetCloseHandler(func(code int, text string) error {
-		log.Println(fmt.Sprintf("Client %s connection closed. Code: %d, Text: %s", clientID, code, text))
+		log.Println(fmt.Sprintf("Client %s connection closed. Code: %d, Text: %s", newClient.GetID(), code, text))
+		newClient.Close()
+		hub := GetHubInstance()
+		hub.Unregister(newClient)
 		return nil
 	})
+
+	go newClient.writePump()
+	go newClient.readPump()
 
 	return newClient
 }
@@ -74,9 +78,18 @@ func (client *ClientImpl) Send(payload any) {
 	client.msgToBeSent <- payload
 }
 
+func (client *ClientImpl) Close() error {
+	for _, room := range client.rooms.Values() {
+		log.Println(fmt.Sprintf("Client %s removed from room %s", client.GetID(), room.GetID()))
+		room.Remove(client)
+	}
+
+	return nil
+}
+
 func (client *ClientImpl) readPump() {
 	defer func() {
-		client.close()
+		client.connection.Close()
 	}()
 
 	client.connection.SetReadLimit(maxMessageSize)
@@ -123,7 +136,7 @@ func (client *ClientImpl) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
-		client.close()
+		client.connection.Close()
 	}()
 	for {
 		select {
@@ -149,16 +162,4 @@ func (client *ClientImpl) writePump() {
 			}
 		}
 	}
-}
-
-func (client *ClientImpl) close() {
-	for _, room := range client.rooms.Values() {
-		room.Remove(client)
-	}
-
-	hub := GetHubInstance()
-	hub.Unregister(client)
-
-	close(client.msgToBeSent)
-	client.connection.Close()
 }
