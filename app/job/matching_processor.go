@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"github.com/hibiken/asynq"
-	"go-to-chat/app/chat"
+	"go-to-chat/app/match/response"
+	"go-to-chat/app/socket"
 	"go-to-chat/app/user"
 	"go-to-chat/app/utility"
 	"log"
+	"sort"
 	"time"
 )
 
@@ -31,12 +33,12 @@ func (p *MatchingProcessor) ProcessTask(_ context.Context, task *asynq.Task) err
 	}
 
 	redisClient, _ := utility.GetRedisClient(utility.TypeDefault)
-	hub := chat.GetHubInstance()
+	hub := socket.GetHubInstance()
 
 	currentUser := payload.Content.User
 	isUserInMatchingPool, _ := redisClient.ZExists("matching_pool", currentUser)
 
-	if !isUserInMatchingPool || !hub.IsUserConnected(currentUser) {
+	if !isUserInMatchingPool || !hub.IsClientConnected(currentUser) {
 		log.Println(fmt.Sprintf("User %s is not in matching pool or not connected", currentUser))
 		return nil
 	}
@@ -49,7 +51,7 @@ func (p *MatchingProcessor) ProcessTask(_ context.Context, task *asynq.Task) err
 	matchedUser := ""
 	for _, user := range userList {
 		user := user.(string)
-		if user != currentUser && hub.IsUserConnected(user) {
+		if user != currentUser && hub.IsClientConnected(user) {
 			matchedUser = user
 			break
 		}
@@ -73,40 +75,42 @@ func (p *MatchingProcessor) ProcessTask(_ context.Context, task *asynq.Task) err
 		return err
 	}
 
-	//TODO: implement chat room creation
-	room := chat.CreateRoom()
-	clientCurrentUser := hub.GetClientFromUsername(currentUser)
-	clientMatchedUser := hub.GetClientFromUsername(matchedUser)
-	room.Join(clientCurrentUser, clientMatchedUser)
-	log.Println(fmt.Sprintf("Client %s joined room", currentUser))
-	log.Println(fmt.Sprintf("Client %s joined room", matchedUser))
+	room := socket.NewRoom(generateRoomID(currentUser, matchedUser))
+	clientCurrentUser := hub.GetClient(currentUser)
+	clientMatchedUser := hub.GetClient(matchedUser)
+	room.Add(clientCurrentUser, clientMatchedUser)
+	log.Println(fmt.Sprintf("Client %s and %s joined room %s", currentUser, matchedUser, room.GetID()))
 
-	matchedResCurrentUser := &chat.SocketMatchUserResponse{
+	matchedResCurrentUser := &response.MatchUserResponse{
 		MatchedUser: &user.UserResponse{
 			ID:    matchedUserEntity.ID,
 			Name:  matchedUserEntity.Name,
 			Email: matchedUserEntity.Email,
 		},
 	}
-	clientCurrentUser.Send(&chat.SocketResponse[*chat.SocketMatchUserResponse]{
-		Event: chat.SocketEventMatched,
-		Data:  matchedResCurrentUser,
-	})
+	clientCurrentUser.Send(
+		socket.NewSocketResponse(socket.SocketEventMatched, matchedResCurrentUser),
+	)
 
-	matchedResMatchedUser := &chat.SocketMatchUserResponse{
+	matchedResMatchedUser := &response.MatchUserResponse{
 		MatchedUser: &user.UserResponse{
 			ID:    currentUserEntity.ID,
 			Name:  currentUserEntity.Name,
 			Email: currentUserEntity.Email,
 		},
 	}
-	clientMatchedUser.Send(&chat.SocketResponse[*chat.SocketMatchUserResponse]{
-		Event: chat.SocketEventMatched,
-		Data:  matchedResMatchedUser,
-	})
+	clientMatchedUser.Send(
+		socket.NewSocketResponse(socket.SocketEventMatched, matchedResMatchedUser),
+	)
 
 	_ = redisClient.ZRemove("matching_pool", currentUser)
 	_ = redisClient.ZRemove("matching_pool", matchedUser)
 	log.Println("process finished")
 	return nil
+}
+
+func generateRoomID(user1 string, user2 string) string {
+	users := []string{user1, user2}
+	sort.Strings(users)
+	return users[0] + ":" + users[1]
 }
