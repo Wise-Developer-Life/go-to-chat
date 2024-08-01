@@ -8,4 +8,6 @@ type User struct {
 	Name            string `gorm:"column:name;primaryKey"`
 	Email           string `gorm:"column:email;payload:varchar(100);uniqueIndex"`
 	EncodedPassword string `gorm:"column:password"`
+
+	ProfileUrl string `gorm:"column:profile_url"`
 }
