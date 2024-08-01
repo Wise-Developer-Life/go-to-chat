@@ -41,6 +41,7 @@ func (service *matchServiceImpl) CreateNewMatchTask(user string) error {
 		&job.EnqueueConfig{
 			Timout: time.Minute * 5,
 		})
+
 	if err != nil {
 		log.Println("Error enqueuing task: ", err)
 		return err

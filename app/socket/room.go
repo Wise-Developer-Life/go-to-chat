@@ -1,8 +1,10 @@
 package socket
 
 import (
+	"fmt"
 	"github.com/ugurcsen/gods-generic/sets"
 	"github.com/ugurcsen/gods-generic/sets/hashset"
+	"log"
 )
 
 type Room interface {
@@ -47,6 +49,10 @@ func (r *RoomImpl) Add(client Client, otherClients ...Client) {
 	for _, c := range clients {
 		r.clients.Add(c)
 		c.AddRoom(r)
+
+		msg := fmt.Sprintf("Client %s join room %s", c.GetID(), r.GetID())
+		log.Println(msg)
+		r.Broadcast(NewSocketResponse(SocketEventJoined, msg))
 	}
 }
 
@@ -55,10 +61,14 @@ func (r *RoomImpl) Remove(client Client, otherClients ...Client) {
 	for _, c := range clients {
 		r.clients.Remove(c)
 		c.RemoveRoom(r)
+
+		msg := fmt.Sprintf("Client %s removed from room %s", c.GetID(), r.GetID())
+		log.Println(msg)
+		r.Broadcast(NewSocketResponse(SocketEventLeft, msg))
 	}
 
 	if r.IsEmpty() {
-		close(r.msgToBeSent)
+		fmt.Sprintf("Room %s is empty. Closing the room", r.GetID())
 	}
 }
 

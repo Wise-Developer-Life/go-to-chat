@@ -24,9 +24,12 @@ func serveWs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := r.URL.Query().Get("user")
+
 	client := NewClient(user, conn)
 	hub := GetHubInstance()
 	hub.Register(client)
+
+	client.Send(NewSocketResponse[any](SocketEventConnected, nil))
 
 	log.Println(fmt.Sprintf("Client %s connected", client.GetID()))
 }
