@@ -1,6 +1,4 @@
-package chat
-
-import "go-to-chat/app/user"
+package socket
 
 type SocketEvent string
 
@@ -12,11 +10,14 @@ const (
 	SocketEventError   SocketEvent = "error"
 )
 
-type SocketResponse[T any] struct {
+type Response[T any] struct {
 	Event SocketEvent `json:"event"`
 	Data  T           `json:"data,omitempty"`
 }
 
-type SocketMatchUserResponse struct {
-	MatchedUser *user.UserResponse `json:"matched_user"`
+func NewSocketResponse[T any](event SocketEvent, data T) *Response[T] {
+	return &Response[T]{
+		Event: event,
+		Data:  data,
+	}
 }

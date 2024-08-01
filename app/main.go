@@ -2,9 +2,9 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
-	"go-to-chat/app/chat"
 	"go-to-chat/app/job"
 	"go-to-chat/app/middleware"
+	"go-to-chat/app/socket"
 	"go-to-chat/database"
 	"go-to-chat/router"
 	"log"
@@ -25,7 +25,7 @@ func main() {
 
 	app := gin.Default()
 
-	app.GET("/ws", chat.HandleChatSocket())
+	app.GET("/ws", socket.HandleWebSocket())
 	app.Use(middleware.ErrorHandler())
 	router.SetupRoutes(app)
 
