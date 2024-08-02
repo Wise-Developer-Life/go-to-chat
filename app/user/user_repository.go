@@ -53,9 +53,10 @@ func (u *userRepositoryImpl) GetUserByEmail(email string) (*model.User, error) {
 }
 
 func (u *userRepositoryImpl) UpdateUser(user *model.User) (*model.User, error) {
-	updateResult := database.GetDBInstance().Updates(user)
-	if updateResult.Error != nil {
-		return nil, updateResult.Error
+	updatedResult := database.GetDBInstance().Updates(user)
+
+	if updatedResult.Error != nil {
+		return nil, updatedResult.Error
 	}
 
 	return user, nil
