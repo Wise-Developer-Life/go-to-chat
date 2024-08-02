@@ -30,9 +30,6 @@ func GetDBInstance() *gorm.DB {
 	return dbInstance
 
 }
-func isDbAvailable() bool {
-	return dbInstance != nil
-}
 
 func migration(db *gorm.DB) error {
 	err := db.AutoMigrate(&model.User{})
