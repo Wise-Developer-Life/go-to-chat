@@ -5,8 +5,13 @@ import (
 	"go-to-chat/app/exception"
 	"go-to-chat/app/model"
 	"go-to-chat/app/utility"
+	"mime/multipart"
+	"path"
+	"path/filepath"
 	"strconv"
 )
+
+const imageFileRootDir = "./data/images"
 
 type CreateUserBody struct {
 	Name     string
@@ -23,6 +28,8 @@ type UserService interface {
 	GetUser(userId int) (*model.User, error)
 	GetUserByEmail(email string) (*model.User, error)
 	UpdateUser(userId int, body *UpdateUserBody) (*model.User, error)
+	UploadProfileImage(userId int, file *multipart.FileHeader) error
+	GetProfileImage(userId int, fileName string) (string, error)
 }
 
 type userServiceImpl struct {
@@ -108,4 +115,47 @@ func (u *userServiceImpl) UpdateUser(userId int, body *UpdateUserBody) (*model.U
 	}
 
 	return updatedUser, nil
+}
+
+func generateProfileImagePath(userId int, fileName string) string {
+	fileExt := filepath.Ext(fileName)
+	return path.Join(imageFileRootDir, strconv.Itoa(userId), "profile_img"+fileExt)
+}
+
+func (u *userServiceImpl) UploadProfileImage(userId int, file *multipart.FileHeader) error {
+	existedUser, err := u.Repository.GetUserById(userId)
+
+	if err != nil {
+		return exception.NewResourceNotFoundError("user", strconv.Itoa(userId))
+	}
+
+	filePath := generateProfileImagePath(userId, file.Filename)
+	_, err = utility.SaveFileLocally(file, filePath)
+
+	if err != nil {
+		return err
+	}
+
+	existedUser.ProfileUrl = fmt.Sprintf("http://localhost:8082/api/v1/user/%d/profile-image?file=%s", userId, filepath.Base(filePath))
+	_, err = u.Repository.UpdateUser(existedUser)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (u *userServiceImpl) GetProfileImage(userId int, fileName string) (string, error) {
+	existedUser, err := u.Repository.GetUserById(userId)
+
+	if err != nil {
+		return "", exception.NewResourceNotFoundError("user", strconv.Itoa(userId))
+	}
+
+	if existedUser.ProfileUrl == "" {
+		return "", exception.NewResourceNotFoundError("profile image", strconv.Itoa(userId))
+	}
+
+	return generateProfileImagePath(userId, fileName), nil
 }

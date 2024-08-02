@@ -87,3 +87,45 @@ func UpdateUser(c *gin.Context) {
 
 	utility.SendSuccessResponse(c, http.StatusOK, "success", NewUserResponse(updatedUser))
 }
+
+func UploadProfileImage(c *gin.Context) {
+	userId, err := strconv.Atoi(c.Param("id"))
+
+	if err != nil {
+		utility.NotifyError(c, exception.NewBadRequestError(err.Error()))
+		return
+	}
+
+	fileHeader, err := c.FormFile("file")
+	if err != nil {
+		utility.NotifyError(c, exception.NewBadRequestError(err.Error()))
+		return
+	}
+
+	err = userService.UploadProfileImage(userId, fileHeader)
+	if err != nil {
+		utility.NotifyError(c, exception.NewBadRequestError(err.Error()))
+		return
+	}
+
+	utility.SendSuccessResponse(c, http.StatusOK, "success", nil)
+}
+
+func GetProfileImage(c *gin.Context) {
+	userId, err := strconv.Atoi(c.Param("id"))
+	fileName, existed := c.GetQuery("file")
+
+	if err != nil || !existed {
+		utility.NotifyError(c, exception.NewBadRequestError(err.Error()))
+		return
+	}
+
+	imagePath, err := userService.GetProfileImage(userId, fileName)
+
+	if err != nil {
+		utility.NotifyError(c, err)
+		return
+	}
+
+	c.File(imagePath)
+}

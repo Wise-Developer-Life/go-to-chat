@@ -82,22 +82,14 @@ func (p *MatchingProcessor) ProcessTask(_ context.Context, task *asynq.Task) err
 	log.Println(fmt.Sprintf("Client %s and %s joined room %s", currentUser, matchedUser, room.GetID()))
 
 	matchedResCurrentUser := &response.MatchUserResponse{
-		MatchedUser: &user.UserResponse{
-			ID:    matchedUserEntity.ID,
-			Name:  matchedUserEntity.Name,
-			Email: matchedUserEntity.Email,
-		},
+		MatchedUser: user.NewUserResponse(matchedUserEntity),
 	}
 	clientCurrentUser.Send(
 		socket.NewSocketResponse(socket.SocketEventMatched, matchedResCurrentUser),
 	)
 
 	matchedResMatchedUser := &response.MatchUserResponse{
-		MatchedUser: &user.UserResponse{
-			ID:    currentUserEntity.ID,
-			Name:  currentUserEntity.Name,
-			Email: currentUserEntity.Email,
-		},
+		MatchedUser: user.NewUserResponse(currentUserEntity),
 	}
 	clientMatchedUser.Send(
 		socket.NewSocketResponse(socket.SocketEventMatched, matchedResMatchedUser),
