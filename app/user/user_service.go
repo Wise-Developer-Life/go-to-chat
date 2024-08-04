@@ -41,7 +41,6 @@ type UserService interface {
 	GetUserByEmail(email string) (*model.User, error)
 	UpdateUser(userId int, body *UpdateUserBody) (*model.User, error)
 	UploadProfileImage(userId int, file *multipart.FileHeader) error
-	GetProfileImage(userId int, fileName string) (string, error)
 }
 
 type userServiceImpl struct {
@@ -196,18 +195,4 @@ func (u *userServiceImpl) UploadProfileImage(userId int, file *multipart.FileHea
 	}
 
 	return nil
-}
-
-func (u *userServiceImpl) GetProfileImage(userId int, fileName string) (string, error) {
-	existedUser, err := u.Repository.GetUserById(userId)
-
-	if err != nil {
-		return "", exception.NewResourceNotFoundError("user", strconv.Itoa(userId))
-	}
-
-	if existedUser.ProfileUrl == "" {
-		return "", exception.NewResourceNotFoundError("profile image", strconv.Itoa(userId))
-	}
-
-	return generateProfileImagePath(userId, fileName), nil
 }

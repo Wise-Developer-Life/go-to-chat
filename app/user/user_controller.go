@@ -110,22 +110,3 @@ func UploadProfileImage(c *gin.Context) {
 
 	utility.SendSuccessResponse(c, http.StatusOK, "success", nil)
 }
-
-func GetProfileImage(c *gin.Context) {
-	userId, err := strconv.Atoi(c.Param("id"))
-	fileName, existed := c.GetQuery("file")
-
-	if err != nil || !existed {
-		utility.NotifyError(c, exception.NewBadRequestError(err.Error()))
-		return
-	}
-
-	imagePath, err := userService.GetProfileImage(userId, fileName)
-
-	if err != nil {
-		utility.NotifyError(c, err)
-		return
-	}
-
-	c.File(imagePath)
-}
