@@ -2,6 +2,11 @@ package user
 
 import (
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"go-to-chat/app/exception"
 	"go-to-chat/app/model"
 	"go-to-chat/app/utility"
@@ -11,7 +16,14 @@ import (
 	"strconv"
 )
 
-const imageFileRootDir = "./data/images"
+// FIXME: refactor this in future
+const (
+	awsRegion    = "us-east-1"
+	awsServerUrl = "http://localhost:4566"
+	s3AppBucket  = "go-to-chat"
+	awsAccessKey = "test"
+	awsSecretKey = "test"
+)
 
 type CreateUserBody struct {
 	Name     string
@@ -29,7 +41,6 @@ type UserService interface {
 	GetUserByEmail(email string) (*model.User, error)
 	UpdateUser(userId int, body *UpdateUserBody) (*model.User, error)
 	UploadProfileImage(userId int, file *multipart.FileHeader) error
-	GetProfileImage(userId int, fileName string) (string, error)
 }
 
 type userServiceImpl struct {
@@ -119,7 +130,7 @@ func (u *userServiceImpl) UpdateUser(userId int, body *UpdateUserBody) (*model.U
 
 func generateProfileImagePath(userId int, fileName string) string {
 	fileExt := filepath.Ext(fileName)
-	return path.Join(imageFileRootDir, strconv.Itoa(userId), "profile_img"+fileExt)
+	return path.Join("profile_images", strconv.Itoa(userId)+fileExt)
 }
 
 func (u *userServiceImpl) UploadProfileImage(userId int, file *multipart.FileHeader) error {
@@ -129,14 +140,54 @@ func (u *userServiceImpl) UploadProfileImage(userId int, file *multipart.FileHea
 		return exception.NewResourceNotFoundError("user", strconv.Itoa(userId))
 	}
 
-	filePath := generateProfileImagePath(userId, file.Filename)
-	_, err = utility.SaveFileLocally(file, filePath)
+	// create a new aws session
+	awsClient, err := session.NewSession(&aws.Config{
+		Region:           aws.String(awsRegion),
+		Endpoint:         aws.String(awsServerUrl),
+		S3ForcePathStyle: aws.Bool(true),
+		Credentials:      credentials.NewStaticCredentials(awsAccessKey, awsSecretKey, ""),
+	})
 
 	if err != nil {
 		return err
 	}
 
-	existedUser.ProfileUrl = fmt.Sprintf("http://localhost:8082/api/v1/user/%d/profile-image?file=%s", userId, filepath.Base(filePath))
+	// open file
+	fileContent, err := file.Open()
+	if err != nil {
+		return err
+	}
+	defer func(fileContent multipart.File) {
+		err := fileContent.Close()
+		if err != nil {
+			fmt.Println(err)
+		}
+	}(fileContent)
+
+	s3Svc := s3.New(awsClient)
+	_, err = s3Svc.CreateBucket(&s3.CreateBucketInput{
+		Bucket: aws.String(s3AppBucket),
+	})
+
+	err = s3Svc.WaitUntilBucketExists(&s3.HeadBucketInput{
+		Bucket: aws.String(s3AppBucket),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to wait for bucket to exist: %v", err)
+	}
+
+	uploader := s3manager.NewUploader(awsClient)
+	result, err := uploader.Upload(&s3manager.UploadInput{
+		Bucket: aws.String(s3AppBucket),
+		Key:    aws.String(generateProfileImagePath(userId, file.Filename)),
+		Body:   fileContent,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	existedUser.ProfileUrl = result.Location
 	_, err = u.Repository.UpdateUser(existedUser)
 
 	if err != nil {
@@ -144,18 +195,4 @@ func (u *userServiceImpl) UploadProfileImage(userId int, file *multipart.FileHea
 	}
 
 	return nil
-}
-
-func (u *userServiceImpl) GetProfileImage(userId int, fileName string) (string, error) {
-	existedUser, err := u.Repository.GetUserById(userId)
-
-	if err != nil {
-		return "", exception.NewResourceNotFoundError("user", strconv.Itoa(userId))
-	}
-
-	if existedUser.ProfileUrl == "" {
-		return "", exception.NewResourceNotFoundError("profile image", strconv.Itoa(userId))
-	}
-
-	return generateProfileImagePath(userId, fileName), nil
 }

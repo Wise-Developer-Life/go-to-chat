@@ -23,8 +23,6 @@ func SetupRoutes(router *gin.Engine) {
 			{
 				userRouter.POST("", userController.CreateUser)
 				userRouter.POST("/:id/profile-image", userController.UploadProfileImage)
-				//TODO: deprecate this endpoint in future, replace with AWS S3
-				userRouter.GET("/:id/profile-image", userController.GetProfileImage)
 			}
 
 			v1Group.POST("/auth/login", authController.Login)
