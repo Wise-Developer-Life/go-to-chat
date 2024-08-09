@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/hibiken/asynq"
+	"go-to-chat/app/chat"
 	"go-to-chat/app/match/response"
 	"go-to-chat/app/socket"
 	"go-to-chat/app/user"
@@ -75,24 +76,39 @@ func (p *MatchingProcessor) ProcessTask(_ context.Context, task *asynq.Task) err
 		return err
 	}
 
-	room := socket.NewRoom(generateRoomID(currentUser, matchedUser))
+	// refactor create chat room
+
+	chatRoomService := chat.GetChatRoomServiceInstance()
+
+	if chatRoomService == nil {
+		return errors.New("error getting chat room service instance")
+	}
+
+	room, err := chatRoomService.CreateChatRoom(generateRoomID(currentUser, matchedUser))
+
+	if err != nil {
+		return err
+	}
+
+	err = chatRoomService.JoinChatRoom(room.ID, currentUser)
+	err = chatRoomService.JoinChatRoom(room.ID, matchedUser)
+
+	log.Println(fmt.Sprintf("Client %s and %s joined room %s", currentUser, matchedUser, room.ID))
+
 	clientCurrentUser := hub.GetClient(currentUser)
 	clientMatchedUser := hub.GetClient(matchedUser)
-	room.Add(clientCurrentUser, clientMatchedUser)
-	log.Println(fmt.Sprintf("Client %s and %s joined room %s", currentUser, matchedUser, room.GetID()))
-
 	matchedResCurrentUser := &response.MatchUserResponse{
 		MatchedUser: user.NewUserResponse(matchedUserEntity),
 	}
 	clientCurrentUser.Send(
-		socket.NewSocketResponse(socket.SocketEventMatched, matchedResCurrentUser),
+		socket.NewSocketMessage(socket.SocketEventMatched, matchedResCurrentUser),
 	)
 
 	matchedResMatchedUser := &response.MatchUserResponse{
 		MatchedUser: user.NewUserResponse(currentUserEntity),
 	}
 	clientMatchedUser.Send(
-		socket.NewSocketResponse(socket.SocketEventMatched, matchedResMatchedUser),
+		socket.NewSocketMessage(socket.SocketEventMatched, matchedResMatchedUser),
 	)
 
 	_ = redisClient.ZRemove("matching_pool", currentUser)

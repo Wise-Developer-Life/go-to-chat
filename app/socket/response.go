@@ -11,14 +11,21 @@ const (
 	SocketEventLeft      SocketEvent = "left"
 )
 
-type Response[T any] struct {
+type SocketMessage[T any] struct {
 	Event SocketEvent `json:"event"`
 	Data  T           `json:"data,omitempty"`
 }
 
-func NewSocketResponse[T any](event SocketEvent, data T) *Response[T] {
-	return &Response[T]{
+func NewSocketMessage[T any](event SocketEvent, data T) *SocketMessage[T] {
+	return &SocketMessage[T]{
 		Event: event,
 		Data:  data,
 	}
+}
+
+type ChatMessage struct {
+	Sender   string `json:"sender"`
+	Receiver string `json:"receiver"`
+	//RoomID   string `json:"room_id"`
+	Message string `json:"text"`
 }

@@ -4,8 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/websocket"
-	"github.com/ugurcsen/gods-generic/maps"
-	"github.com/ugurcsen/gods-generic/maps/hashmap"
+	"go-to-chat/app/chat"
 	"log"
 	"time"
 )
@@ -26,8 +25,6 @@ const (
 
 type Client interface {
 	GetID() string
-	AddRoom(room Room)
-	RemoveRoom(room Room)
 	Send(payload any)
 	Close() error
 }
@@ -36,8 +33,6 @@ type ClientImpl struct {
 	connection  *websocket.Conn
 	clientID    string
 	msgToBeSent chan any
-	// FIXME: support only one room this time
-	rooms maps.Map[string, Room]
 }
 
 func NewClient(clientID string, connection *websocket.Conn) Client {
@@ -45,7 +40,6 @@ func NewClient(clientID string, connection *websocket.Conn) Client {
 		clientID:    clientID,
 		connection:  connection,
 		msgToBeSent: make(chan any),
-		rooms:       hashmap.New[string, Room](),
 	}
 
 	connection.SetCloseHandler(func(code int, text string) error {
@@ -66,24 +60,11 @@ func (client *ClientImpl) GetID() string {
 	return client.clientID
 }
 
-func (client *ClientImpl) AddRoom(room Room) {
-	client.rooms.Put(room.GetID(), room)
-}
-
-func (client *ClientImpl) RemoveRoom(room Room) {
-	client.rooms.Remove(room.GetID())
-}
-
 func (client *ClientImpl) Send(payload any) {
 	client.msgToBeSent <- payload
 }
 
 func (client *ClientImpl) Close() error {
-	for _, room := range client.rooms.Values() {
-		log.Println(fmt.Sprintf("Client %s removed from room %s", client.GetID(), room.GetID()))
-		room.Remove(client)
-	}
-
 	return nil
 }
 
@@ -101,7 +82,7 @@ func (client *ClientImpl) readPump() {
 	})
 
 	for {
-		var message any
+		var message SocketMessage[any]
 		err := client.connection.ReadJSON(&message)
 
 		if err != nil {
@@ -111,24 +92,50 @@ func (client *ClientImpl) readPump() {
 			break
 		}
 
-		// json string of message
-		messageBytes, _ := json.Marshal(message)
-
-		log.Println(fmt.Sprintf("Message received from %s: %s", client.GetID(), string(messageBytes)))
-
-		client.dispatchMessage(message)
+		dataBytes, _ := json.Marshal(message.Data)
+		_ = client.dispatchMessage(message.Event, dataBytes)
 	}
 }
 
 // FIXME: add more common Dispatch Message pattern
-func (client *ClientImpl) dispatchMessage(message any) error {
-	allRoomsOfClient := client.rooms.Values()
-	if len(allRoomsOfClient) == 0 {
-		return nil
+func (client *ClientImpl) dispatchMessage(event SocketEvent, data []byte) error {
+	hub := GetHubInstance()
+	chatRoomService := chat.GetChatRoomServiceInstance()
+
+	if event == SocketEventMessage {
+		log.Println(fmt.Sprintf("Message received from %s: %s", client.GetID(), data))
+		var chatMessage ChatMessage
+		err := json.Unmarshal(data, &chatMessage)
+
+		if err != nil {
+			return err
+		}
+
+		log.Println(fmt.Sprintf("Message received from %s: %s", client.GetID(), chatMessage.Message))
+
+		// TODO: fix this in future
+		choices := []string{
+			chatMessage.Sender + ":" + chatMessage.Receiver,
+			chatMessage.Receiver + ":" + chatMessage.Sender,
+		}
+
+		for _, roomID := range choices {
+			chatRoom, err := chatRoomService.GetChatRoom(roomID)
+			log.Println(fmt.Sprintf("Chat room: %s", roomID))
+
+			if err != nil {
+				continue
+			}
+
+			for _, userInRoom := range chatRoom.GetUsers() {
+				socketClient := hub.GetClient(userInRoom)
+				if socketClient != nil {
+					socketClient.Send(NewSocketMessage(SocketEventMessage, chatMessage))
+				}
+			}
+		}
 	}
 
-	room := allRoomsOfClient[0]
-	room.Broadcast(message)
 	return nil
 }
 

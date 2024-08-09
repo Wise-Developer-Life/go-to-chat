@@ -50,6 +50,7 @@ var mapRedisClient = make(map[ConnectionType]RedisClient)
 type RedisClient interface {
 	Set(key string, value any, ttl time.Duration) error
 	Get(key string) (string, error)
+	Del(key string) error
 	ZAdd(key string, value any, score float64) error
 	ZRange(key string, start, end int64, reverse bool) ([]any, error)
 	ZRemove(key string, value any) error
@@ -117,6 +118,15 @@ func (r *redisClientImpl) Get(key string) (string, error) {
 		return "", status.Err()
 	}
 	return status.Val(), nil
+}
+
+func (r *redisClientImpl) Del(key string) error {
+	status := r.client.Del(ctx, key)
+	if status.Err() != nil {
+		return status.Err()
+	}
+
+	return nil
 }
 
 func (r *redisClientImpl) ZAdd(key string, value any, score float64) error {

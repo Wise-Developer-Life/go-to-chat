@@ -29,7 +29,7 @@ func serveWs(w http.ResponseWriter, r *http.Request) {
 	hub := GetHubInstance()
 	hub.Register(client)
 
-	client.Send(NewSocketResponse[any](SocketEventConnected, nil))
+	client.Send(NewSocketMessage[any](SocketEventConnected, nil))
 
 	log.Println(fmt.Sprintf("Client %s connected", client.GetID()))
 }
