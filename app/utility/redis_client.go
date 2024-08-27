@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/redis/go-redis/v9"
+	"go-to-chat/app/config"
 	"time"
 )
 
@@ -26,21 +27,6 @@ type ConnectionConfig struct {
 
 func (c *ConnectionConfig) Address() string {
 	return fmt.Sprintf("%s:%d", c.Host, c.Port)
-}
-
-var configSet = map[ConnectionType]*ConnectionConfig{
-	"default": {
-		Host:     "localhost",
-		Port:     6378,
-		Password: "",
-		DB:       0,
-	},
-	"job_cache": {
-		Host:     "localhost",
-		Port:     6378,
-		Password: "",
-		DB:       1,
-	},
 }
 
 var ctx = context.Background()
@@ -80,19 +66,41 @@ func newRedisClientImpl(connection ConnectionType, config *ConnectionConfig) (*r
 }
 
 func GetRedisConfig(connection ConnectionType) (*ConnectionConfig, error) {
-	if redisConfig, ok := configSet[connection]; ok {
-		return redisConfig, nil
+	appConfig, err := config.GetAppConfig()
+	if err != nil {
+		return nil, err
 	}
-	return nil, errors.New("connection not found")
-}
 
-func GetRedisClient(connection ConnectionType) (RedisClient, error) {
-	if _, ok := configSet[connection]; !ok {
+	var targetConfig *config.RedisConfig
+
+	switch connection {
+	case TypeDefault:
+		targetConfig = appConfig.Redis.DefaultRedisConfig
+	case TypeJobCache:
+		targetConfig = appConfig.Redis.JobRedisConfig
+	}
+
+	if targetConfig == nil {
 		return nil, errors.New("connection not found")
 	}
 
+	return &ConnectionConfig{
+		Host:     targetConfig.Host,
+		Port:     targetConfig.Port,
+		Password: targetConfig.Password,
+		DB:       targetConfig.DB,
+	}, nil
+}
+
+func GetRedisClient(connection ConnectionType) (RedisClient, error) {
+	connectionConfig, err := GetRedisConfig(connection)
+
+	if err != nil {
+		return nil, err
+	}
+
 	if _, ok := mapRedisClient[connection]; !ok {
-		newCreatedClient, err := newRedisClientImpl(connection, configSet[connection])
+		newCreatedClient, err := newRedisClientImpl(connection, connectionConfig)
 
 		if err != nil {
 			return nil, err
