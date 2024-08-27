@@ -1,6 +1,8 @@
 package database
 
 import (
+	"fmt"
+	"go-to-chat/app/config"
 	"go-to-chat/app/model"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -10,7 +12,18 @@ import (
 var dbInstance *gorm.DB
 
 func SetupDatabase() {
-	dsn := "host=localhost user=postgres password=secret dbname=postgres port=5434"
+	appConfig, err := config.GetAppConfig()
+	if err != nil {
+		log.Fatal("Error getting app config: ", err)
+	}
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d",
+		appConfig.Database.Host,
+		appConfig.Database.Username,
+		appConfig.Database.Password,
+		appConfig.Database.DBName,
+		appConfig.Database.Port,
+	)
+
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		panic("failed to connect database")

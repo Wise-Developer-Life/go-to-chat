@@ -1,0 +1,38 @@
+{
+  "database": {
+    "driver": "psql",
+    "host": "localhost",
+    "port": 5434,
+    "username": "postgres",
+    "password": "secret",
+    "dbname": "postgres"
+  },
+  "redis": {
+    "default": {
+      "host": "localhost",
+      "port": 6378,
+      "password": "",
+      "db": 0
+    },
+    "job": {
+      "host": "localhost",
+      "port": 6378,
+      "password": "",
+      "db": 1
+    }
+  },
+  "aws": {
+    "gateway": "http://localhost:4566",
+    "region": "us-east-1",
+    "credential": {
+      "accessKey": "test",
+      "secretKey": "test"
+    },
+    "s3": {
+      "bucket": "go-to-chat"
+    }
+  },
+  "server": {
+    "port": 8082
+  }
+}

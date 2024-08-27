@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"go-to-chat/app/config"
 	"go-to-chat/app/exception"
 	"go-to-chat/app/model"
 	"go-to-chat/app/utility"
@@ -14,15 +15,6 @@ import (
 	"path"
 	"path/filepath"
 	"strconv"
-)
-
-// FIXME: refactor this in future
-const (
-	awsRegion    = "us-east-1"
-	awsServerUrl = "http://localhost:4566"
-	s3AppBucket  = "go-to-chat"
-	awsAccessKey = "test"
-	awsSecretKey = "test"
 )
 
 type CreateUserBody struct {
@@ -140,19 +132,18 @@ func (u *userServiceImpl) UploadProfileImage(userId int, file *multipart.FileHea
 		return exception.NewResourceNotFoundError("user", strconv.Itoa(userId))
 	}
 
-	// create a new aws session
-	awsClient, err := session.NewSession(&aws.Config{
-		Region:           aws.String(awsRegion),
-		Endpoint:         aws.String(awsServerUrl),
-		S3ForcePathStyle: aws.Bool(true),
-		Credentials:      credentials.NewStaticCredentials(awsAccessKey, awsSecretKey, ""),
-	})
+	appConfig, err := config.GetAppConfig()
 
 	if err != nil {
 		return err
 	}
 
-	// open file
+	awsClient, err := getAwsClient(appConfig.Aws)
+
+	if err != nil {
+		return err
+	}
+
 	fileContent, err := file.Open()
 	if err != nil {
 		return err
@@ -164,13 +155,14 @@ func (u *userServiceImpl) UploadProfileImage(userId int, file *multipart.FileHea
 		}
 	}(fileContent)
 
+	bucketName := appConfig.Aws.S3.Bucket
 	s3Svc := s3.New(awsClient)
 	_, err = s3Svc.CreateBucket(&s3.CreateBucketInput{
-		Bucket: aws.String(s3AppBucket),
+		Bucket: aws.String(bucketName),
 	})
 
 	err = s3Svc.WaitUntilBucketExists(&s3.HeadBucketInput{
-		Bucket: aws.String(s3AppBucket),
+		Bucket: aws.String(bucketName),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to wait for bucket to exist: %v", err)
@@ -178,7 +170,7 @@ func (u *userServiceImpl) UploadProfileImage(userId int, file *multipart.FileHea
 
 	uploader := s3manager.NewUploader(awsClient)
 	result, err := uploader.Upload(&s3manager.UploadInput{
-		Bucket: aws.String(s3AppBucket),
+		Bucket: aws.String(bucketName),
 		Key:    aws.String(generateProfileImagePath(userId, file.Filename)),
 		Body:   fileContent,
 	})
@@ -195,4 +187,25 @@ func (u *userServiceImpl) UploadProfileImage(userId int, file *multipart.FileHea
 	}
 
 	return nil
+}
+
+func getAwsClient(awsConfig *config.AwsConfig) (*session.Session, error) {
+	awsCredential := credentials.NewStaticCredentials(
+		awsConfig.Credential.AccessKey,
+		awsConfig.Credential.SecretKey,
+		"",
+	)
+
+	awsClient, err := session.NewSession(&aws.Config{
+		Region:           aws.String(awsConfig.Region),
+		Endpoint:         aws.String(awsConfig.Gateway),
+		S3ForcePathStyle: aws.Bool(true),
+		Credentials:      awsCredential,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return awsClient, nil
 }
