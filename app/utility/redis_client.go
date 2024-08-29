@@ -37,6 +37,9 @@ type RedisClient interface {
 	Set(key string, value any, ttl time.Duration) error
 	Get(key string) (string, error)
 	Del(key string) error
+	HSet(kek string, field string, value any) error
+	HGet(key string, field string) (string, error)
+	HDel(key string, field string) error
 	ZAdd(key string, value any, score float64) error
 	ZRange(key string, start, end int64, reverse bool) ([]any, error)
 	ZRemove(key string, value any) error
@@ -208,4 +211,35 @@ func (r *redisClientImpl) ZExists(key string, value any) (bool, error) {
 		return false, status.Err()
 	}
 	return true, nil
+}
+
+func (r *redisClientImpl) HSet(key string, field string, value any) error {
+	var bytesDate []byte
+	if _, ok := value.(string); !ok {
+		bytesDate, _ = json.Marshal(value)
+	} else {
+		bytesDate = []byte(value.(string))
+	}
+
+	status := r.client.HSet(ctx, key, field, bytesDate)
+	if status.Err() != nil {
+		return status.Err()
+	}
+	return nil
+}
+
+func (r *redisClientImpl) HGet(key string, field string) (string, error) {
+	status := r.client.HGet(ctx, key, field)
+	if status.Err() != nil {
+		return "", status.Err()
+	}
+	return status.Val(), nil
+}
+
+func (r *redisClientImpl) HDel(key string, field string) error {
+	status := r.client.HDel(ctx, key, field)
+	if status.Err() != nil {
+		return status.Err()
+	}
+	return nil
 }

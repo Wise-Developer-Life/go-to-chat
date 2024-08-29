@@ -11,6 +11,8 @@ type RoomRepository interface {
 	GetChatRoom(chatRoomName string) (*model.ChatRoom, error)
 	UpdateChatRoom(chatRoom *model.ChatRoom) (*model.ChatRoom, error)
 	DeleteChatRoom(chatRoomName string) error
+	GetRoomByUser(user string) (*model.ChatRoom, error)
+	SetRoomByUser(user string, chatRoomName string) error
 }
 
 type RoomRepositoryRedisImpl struct {
@@ -71,4 +73,28 @@ func (repo *RoomRepositoryRedisImpl) UpdateChatRoom(chatRoom *model.ChatRoom) (*
 
 func (repo *RoomRepositoryRedisImpl) DeleteChatRoom(chatRoomName string) error {
 	return repo.redisClient.Del(chatRoomName)
+}
+
+func (repo *RoomRepositoryRedisImpl) SetRoomByUser(user string, chatRoomName string) error {
+	if chatRoomName == "" {
+		return repo.redisClient.HDel("user_room", user)
+	}
+
+	return repo.redisClient.HSet("user_room", user, chatRoomName)
+}
+
+func (repo *RoomRepositoryRedisImpl) GetRoomByUser(user string) (*model.ChatRoom, error) {
+	chatRoomName, err := repo.redisClient.HGet("user_room", user)
+
+	if err != nil {
+		return nil, err
+	}
+
+	chatRoom, err := repo.GetChatRoom(chatRoomName)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return chatRoom, nil
 }

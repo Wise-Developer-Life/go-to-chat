@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/websocket"
-	"go-to-chat/app/chat"
 	"log"
 	"time"
 )
@@ -92,51 +91,8 @@ func (client *ClientImpl) readPump() {
 			break
 		}
 
-		dataBytes, _ := json.Marshal(message.Data)
-		_ = client.dispatchMessage(message.Event, dataBytes)
+		HandleSocketInputMessage(client, message.Event, message.Data)
 	}
-}
-
-// FIXME: add more common Dispatch Message pattern
-func (client *ClientImpl) dispatchMessage(event SocketEvent, data []byte) error {
-	hub := GetHubInstance()
-	chatRoomService := chat.GetChatRoomServiceInstance()
-
-	if event == SocketEventMessage {
-		log.Println(fmt.Sprintf("Message received from %s: %s", client.GetID(), data))
-		var chatMessage ChatMessage
-		err := json.Unmarshal(data, &chatMessage)
-
-		if err != nil {
-			return err
-		}
-
-		log.Println(fmt.Sprintf("Message received from %s: %s", client.GetID(), chatMessage.Message))
-
-		// TODO: fix this in future
-		choices := []string{
-			chatMessage.Sender + ":" + chatMessage.Receiver,
-			chatMessage.Receiver + ":" + chatMessage.Sender,
-		}
-
-		for _, roomID := range choices {
-			chatRoom, err := chatRoomService.GetChatRoom(roomID)
-			log.Println(fmt.Sprintf("Chat room: %s", roomID))
-
-			if err != nil {
-				continue
-			}
-
-			for _, userInRoom := range chatRoom.GetUsers() {
-				socketClient := hub.GetClient(userInRoom)
-				if socketClient != nil {
-					socketClient.Send(NewSocketMessage(SocketEventMessage, chatMessage))
-				}
-			}
-		}
-	}
-
-	return nil
 }
 
 func (client *ClientImpl) writePump() {
